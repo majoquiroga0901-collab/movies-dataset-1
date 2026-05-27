@@ -1,1 +1,2 @@
-Date,Client,Advisor,Package,Destination,Cruise,Hotel,Commission,Follow-up status
+Date,Client,Advisor,Package,Estado,Age,Marital status,Residency,Children count,Children ages,Destination,Cruise,Hotel,Commission,Follow-up status
+2026-05-27 03:46:10,Pantalon,Juan Pablo,VDL,Alabama,30,Casado / Convive,Sí,0,,Cancún,"Miami → Key West + Cozumel, Port Canaveral → Bahamas + Nassau, Long Beach → Ensenada + Islas Catalina, New Orleans → Cozumel + Progreso",,23.94,Closed sale

@@ -791,6 +791,19 @@ def clients_page():
             st.success("Cliente guardado.")
             st.rerun()
 
+    st.markdown("---")
+    st.subheader("Manage filtered client")
+    selected_client = st.selectbox("Seleccionar cliente para borrar", [c["ID"] + " - " + c["Full name"] for c in filtered] if filtered else [])
+    if selected_client:
+        selected_id = selected_client.split(" - ")[0]
+        client = next((c for c in clients if c["ID"] == selected_id), None)
+        if client:
+            if st.button("Borrar cliente seleccionado"):
+                clients[:] = [c for c in clients if c["ID"] != selected_id]
+                save_clients(clients)
+                st.success("Cliente borrado.")
+                st.rerun()
+
 
 def sales_page():
     st.title("🛒 Sales")
@@ -886,8 +899,21 @@ def sales_page():
     def hijos_validos_mix(edades):
         return all(edad_hijo <= 17 for edad_hijo in edades)
 
-    cliente = st.text_input("Cliente")
-    estado = st.selectbox("Estado", sorted(zonas.keys()))
+    if "sale_cliente" not in st.session_state:
+        st.session_state.sale_cliente = ""
+    if "sale_estado" not in st.session_state:
+        st.session_state.sale_estado = sorted(zonas.keys())[0]
+    if "sale_estado_civil" not in st.session_state:
+        st.session_state.sale_estado_civil = "Casado / Convive"
+    if "sale_edad" not in st.session_state:
+        st.session_state.sale_edad = 30
+    if "sale_residencia" not in st.session_state:
+        st.session_state.sale_residencia = "Sí"
+    if "sale_cantidad_hijos" not in st.session_state:
+        st.session_state.sale_cantidad_hijos = 0
+
+    cliente = st.text_input("Cliente", key="sale_cliente")
+    estado = st.selectbox("Estado", sorted(zonas.keys()), key="sale_estado")
     estado_civil = st.selectbox(
         "Estado civil",
         [
@@ -895,15 +921,19 @@ def sales_page():
             "Mujer Soltera",
             "Hombre Soltero",
         ],
+        key="sale_estado_civil",
     )
-    edad = st.number_input("Edad", 18, 100, 30)
-    residencia = st.selectbox("Residencia", ["Sí", "No"])
-    cantidad_hijos = st.number_input("Cantidad hijos", 0, 10, 0)
+    edad = st.number_input("Edad", 18, 100, 30, key="sale_edad")
+    residencia = st.selectbox("Residencia", ["Sí", "No"], key="sale_residencia")
+    cantidad_hijos = st.number_input("Cantidad hijos", 0, 10, 0, key="sale_cantidad_hijos")
     edades_hijos = []
     if cantidad_hijos > 0:
         st.subheader("Edades hijos")
         for i in range(cantidad_hijos):
-            edad_hijo = st.number_input(f"Edad hijo {i+1}", 0, 25, key=f"hijo_{i}")
+            clave_hijo = f"sale_hijo_{i}"
+            if clave_hijo not in st.session_state:
+                st.session_state[clave_hijo] = 0
+            edad_hijo = st.number_input(f"Edad hijo {i+1}", 0, 25, value=st.session_state[clave_hijo], key=clave_hijo)
             edades_hijos.append(edad_hijo)
 
     paquete = "MIX & MATCH"
@@ -991,6 +1021,33 @@ def sales_page():
         porcentaje = st.selectbox("Porcentaje comisión", [6, 8])
         comision = deducible * (porcentaje / 100)
         st.metric("Comisión estimada", f"${comision:,.2f}")
+
+        if st.button("Limpiar formulario"):
+            st.session_state.sale_cliente = ""
+            st.session_state.sale_estado = sorted(zonas.keys())[0]
+            st.session_state.sale_estado_civil = "Casado / Convive"
+            st.session_state.sale_edad = 30
+            st.session_state.sale_residencia = "Sí"
+            st.session_state.sale_cantidad_hijos = 0
+            for i in range(10):
+                clave_hijo = f"sale_hijo_{i}"
+                if clave_hijo in st.session_state:
+                    del st.session_state[clave_hijo]
+            st.rerun()
+
+        advisor_name = name or "Tu asesor"
+        client_label = cliente or "cliente"
+        speech_text = f"Hola {client_label},\n\nSoy {advisor_name} y quiero proponerte el paquete {paquete}. "
+        if paquete == "VDL":
+            speech_text += "Este paquete es ideal para tu perfil porque ofrece hospedaje premium, transporte incluido y acceso a experiencias All Inclusive."
+        elif paquete == "HÍBRIDO":
+            speech_text += "Lo recomiendo para tu perfil como mujer soltera, ya que combina un destino VDL con opciones flexibles Mix & Match."
+        else:
+            speech_text += "Con MIX & MATCH puedes reservar en varios destinos y aprovechar una vigencia flexible sin Time Share."
+        speech_text += f"\n\nTu destino recomendado es {destinos[0] if destinos else 'un destino disponible'}.\n\n¿Te gustaría avanzar con esta opción?"
+
+        st.subheader("Texto para asesor")
+        st.text_area("Copy para cerrar la venta", speech_text, height=180)
 
         if st.button("Registrar Venta"):
             sales.append({
@@ -1153,6 +1210,20 @@ def sales_history_page(is_admin=True):
         if filter_advisor and filter_advisor != "Todos":
             filtered = [s for s in filtered if s["Advisor"] == filter_advisor]
         st.dataframe(filtered)
+        st.markdown("---")
+        if filtered:
+            selected_sale = st.selectbox(
+                "Seleccionar venta para borrar",
+                [f"{idx + 1} - {sale['Date']} - {sale['Client']} - {sale['Package']}" for idx, sale in enumerate(filtered)],
+            )
+            if selected_sale:
+                delete_index = int(selected_sale.split(" - ")[0]) - 1
+                sale_to_delete = filtered[delete_index]
+                if st.button("Borrar venta seleccionada"):
+                    sales.remove(sale_to_delete)
+                    save_sales(sales)
+                    st.success("Venta borrada.")
+                    st.rerun()
         csv_data = "Date,Client,Advisor,Package,Destination,Cruise,Hotel,Commission,Follow-up status\n"
         for row in filtered:
             csv_data += ",".join([row[k].replace(",", ";") for k in ["Date", "Client", "Advisor", "Package", "Destination", "Cruise", "Hotel", "Commission", "Follow-up status"]]) + "\n"
